@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Index</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script type="text/javascript" src="jquery/jquery.js"></script>
+    <script type="text/javascript" src="jquery/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="jquery/jquery.mask.min.js"></script>
+
+    <script type="text/javascript" src="js/code.js"></script>
+
+    <link href="css/jquery-ui.min.css" rel="stylesheet" type="text/css">
+    <link href="css/style.css" rel="stylesheet" type="text/css">
+
+    <link href="css/select2.min.css" rel="stylesheet" />
+    <script src="js/select2.min.js"></script>
+    <script src="js/en.js"></script>
+</head>
+
+<body>
+
+    <div id="box1" align="center">
+        <div>
+            <h3>Hamlethub - online Contact Finder</h3>
+        </div>
+        <div id="menu" align="center"></div>
+    </div>
+
+    <div class="centerButton">
+        <button type="button" id="loadMetaDataButton" class="loadMetaDataButton" onclick="LoadMetadata();">Load next
+            business</button>
+    </div>
+
+    <div class="center">
+        <form id="b_form">
+            <label for="b_name">Business name:</label>
+            <input type="text" id="input_b_name" name="input_b_name" value=""><br><br>
+            <label for="b_name">Business phone:</label>
+            <input type="text" id="input_b_phone" name="input_b_phone" value=""><br><br>
+            <label for="b_name">Business address:</label>
+            <input type="text" id="input_b_address" name="input_b_address" value=""><br><br>
+            <label for="b_name">Business website:</label>
+            <input type="text" id="input_b_website" name="input_b_website" value=""><br><br>
+        </form>
+    </div>
+
+    <div class="flex-container">
+
+        <div class="flex-child magenta">
+            <b>LOAD BING</b>
+            <p>Load keyword on the Bing search engine, and it will display only Facebook links that correspond to
+                this keyword.</p>
+            <button type="button" id="loadBing" class="loadBing" onclick="LoadBing();">Continue</button>
+        </div>
+
+        <div class="flex-child magenta">
+            <b>LOAD DUCKDUCKGO</b>
+            <p>Load keyword on the duckduckgo search engine, and it will display only Facebook links that correspond to
+                this keyword.</p>
+            <button type="button" id="loadddg" class="loadddg" onclick="loadDuckDuckGo();">Continue</button>
+        </div>
+
+        <div class="flex-child green">
+            <b>LOAD GOOGLE</b>
+            <p>Load keyword on the Google search engine, and it will display business details on the Google sidebar
+                on the right.</p>
+            <button type="button" id="loadGoogle" class="loadGoogle" onclick="LoadGoogle();">Continue</button>
+        </div>
+
+    </div>
+    <div>
+        <br>
+        * Please note - make sure to allow pop-ups and redirects on Chrome for this website
+    </div>
+
+
+
+</body>
+<script>
+    $.post('/menu', function (data) {
+        $('#menu').append(data);
+    });
+
+    function LoadMetadata() {
+        $.post("/loadmetadata", function (data) {
+            document.getElementById("input_b_name").value = data.Name;
+            document.getElementById("input_b_phone").value = data.Phone;
+            document.getElementById("input_b_address").value = data.Address;
+            document.getElementById("input_b_website").value = data.Website;
+        });
+    }
+
+    function LoadBing() {
+        if (!document.getElementById("input_b_name").value == '') {
+            let entity_name;
+            let entity_town;
+            let bing_url = 'https://www.bing.com/search?q=';
+
+            function GetEntityName() {
+                entity_name = document.getElementById("input_b_name").value.split(' ').join('+');
+            }
+
+            async function GetEntityTown() {
+                var reqdata = {
+                    address: document.getElementById("input_b_address").value,
+                };
+
+                await $.post("/ReturnTownFromString", reqdata, async function (data) {
+                    entity_town = data;
+                });
+            }
+
+            async function GetKeywordData() {
+                const AwaitEntityName = await GetEntityName();
+                
+                const AwaitEntityAddress = await GetEntityTown();
+                
+                bing_url += entity_name.replace('&', '+') + '+%22' + entity_town.split(' ').join('+') + ',+ct' + '%22' + '+site%3Afacebook.com+prefer%3Abusiness+-biz+loc%3AUS'
+         
+                window.open(bing_url, '_blank', 'noreferrer')
+            }
+
+            GetKeywordData();
+        } else {
+            alert('Please load the business first.')
+        }
+    }
+
+    function loadDuckDuckGo() {
+        if (!document.getElementById("input_b_name").value == '') {
+            let entity_name;
+            let entity_town;
+            let ddgo_url = 'https://duckduckgo.com/?q=';
+
+            function GetEntityName() {
+                entity_name = document.getElementById("input_b_name").value.split(' ').join('+');
+            }
+
+            async function GetEntityTown() {
+                var reqdata = {
+                    address: document.getElementById("input_b_address").value,
+                };
+
+                await $.post("/ReturnTownFromString", reqdata, async function (data) {
+                    entity_town = data;
+                });
+            }
+
+            async function GetKeywordData() {
+                const AwaitEntityName = await GetEntityName();
+                
+                const AwaitEntityAddress = await GetEntityTown();
+                
+                ddgo_url += entity_name.replace('&', '+') + '+%22' + entity_town.split(' ').join('+') + ',+ct' + '%22' + '+site%3Afacebook.com&t=h_&ia=web'
+         
+                window.open(ddgo_url, '_blank', 'noreferrer')
+            }
+
+            GetKeywordData();
+        } else {
+            alert('Please load the business first.')
+        }
+    }
+
+    function LoadGoogle() {
+        if (!document.getElementById("input_b_name").value == '') {
+            let entity_name;
+            let entity_town;
+            let google_url = 'https://www.google.com/search?q=';
+
+            function GetEntityName() {
+                entity_name = document.getElementById("input_b_name").value.split(' ').join('+');
+            }
+
+            async function GetEntityTown() {
+                var reqdata = {
+                    address: document.getElementById("input_b_address").value,
+                };
+
+                await $.post("/ReturnTownFromString", reqdata, async function (data) {
+                    entity_town = data;
+                });
+            }
+
+            async function GetKeywordData() {
+                const AwaitEntityName = await GetEntityName();
+             
+                const AwaitEntityAddress = await GetEntityTown();
+                console.log(entity_town);
+                google_url += entity_name + '+' + entity_town + ',+ct'
+
+                window.open(google_url, '_blank', 'noreferrer')
+            }
+
+            GetKeywordData();
+        } else {
+            alert('Please load the business first.')
+        }
+    }
+
+
+
+</script>
+
+</html>

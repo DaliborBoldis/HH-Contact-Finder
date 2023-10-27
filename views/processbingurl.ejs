@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Eventhub Web Scraper</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <script type="text/javascript" src="jquery/jquery.js"></script>
+    <script type="text/javascript" src="jquery/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="jquery/jquery.mask.min.js"></script>
+
+    <script type="text/javascript" src="js/code.js"></script>
+
+    <link href="css/jquery-ui.min.css" rel="stylesheet" type="text/css" />
+    <link href="css/style.css" rel="stylesheet" type="text/css" />
+
+    <link href="css/select2.min.css" rel="stylesheet" />
+    <script src="js/select2.min.js"></script>
+    <script src="js/en.js"></script>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="flexTextarea">
+        <textarea id="inputAreaNames" name="inputAreaNames" rows="10" cols="100"> Enter business names here</textarea>
+        <textarea id="inputAreaAddresses" name="inputAreaAddresses" rows="10" cols="100"> Enter business addresses here</textarea>
+        <button class="button" onclick="ProcessItems()">Start processing</button>
+        <button class="button" onclick="CopyTableContent()">Copy Table Content</button>
+      </div>
+      <table border="1" class="tableStyle" id="business_table">
+        <tr>
+          <th colspan="5" id="PR_Title">Bing table</th>
+        </tr>
+        <tr>
+          <th>Website</th>
+          <th>Facebook</th>
+          <th>Twitter</th>
+          <th>Instagram</th>
+          <th>LinkedIn</th>
+          <th>Phone</th>
+          <th>Address</th>
+          <th>Events URL Collection</th>
+          <th>Has Google schema</th>
+          <th>Detected types</th>
+        </tr>
+      </table>
+    </div>
+  </body>
+  <script>
+    $.post("/menu", function (data) {
+      // Request menu entries
+      $("#menu").append(data);
+    });
+
+    async function ProcessItems() {
+      console.log("Step 1 - Get input");
+      // Loop through all the items in the input area
+      var names = $("#inputAreaNames").val().split("\n");
+      var addresses = $("#inputAreaAddresses").val().split("\n");
+
+      var items = [];
+      for (var i = 0; i < names.length; i++) {
+        if (names[i] != "") {
+          // Wait two seconds
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          let item = names[i].replace(/\s/g, "+").replace("&", "").replace("’", "") + "+" + addresses[i].replace(/\s/g, "+");
+          console.log(names[i]);
+          console.log("Step 2 - Fetch from bing");
+          await FetchFromServer("http://localhost:8080/processbinglinks/", item)
+            .then(async (doc) => {
+              return await GetLinksFromHTML(
+                doc.getElementById("b_context"),
+                doc.getElementsByClassName("b_vPanel")[0],
+                "http://www.bing.com"
+              );
+            })
+            // Process bing links
+            .then(async (links) => {
+              console.log("Step 3 - Process bing link");
+              return await ProcessBingLinks(links);
+            })
+            // Process web links that we got from bing links
+            .then(async (searchData) => {
+              console.log("Step 4 - Process web link");
+              // Check if searchData website is empty
+              if (searchData.Website == "") {
+                GenerateTable(searchData);
+              } else {
+                return await ProcessWebLink(searchData);
+              }
+            });
+        }
+        console.log("DONE PROCESSING: " + names[i]);
+      }
+    }
+
+    async function ProcessBingLinks(links) {
+      // Define the searchData object
+      let searchData = {
+        Website: "",
+        Facebook: "",
+        Twitter: "",
+        Instagram: "",
+        LinkedIn: "",
+        Phone: "",
+        Address: "",
+        EventsMain: [],
+        HasGoogleEventsSchema: false,
+        DetectedTypes: [],
+      };
+      console.log("Loop through bing links - in function");
+      // Loop through all the links in the bing search results and get the website, facebook, twitter, instagram, linkedin, phone and address
+      for (var j = 0; j < links.length; j++) {
+        // Loop through links and find facebook
+        for (var i = 0; i < links.length; i++) {
+          if (links[i][0].includes("Facebook")) {
+            // Check if Facebook variable is empty
+            if (searchData.Facebook.length == 0) {
+              searchData.Facebook = links[i][1];
+            }
+          }
+          if (links[i][0].includes("Twitter")) {
+            // Check if Twitter variable is empty
+            if (searchData.Twitter.length == 0) {
+              searchData.Twitter = links[i][1];
+            }
+          }
+          if (links[i][0].includes("Instagram")) {
+            // Check if Instagram variable is empty
+            if (searchData.Instagram.length == 0) {
+              searchData.Instagram = links[i][1];
+            }
+          }
+          if (links[i][0].includes("LinkedIn")) {
+            // Check if LinkedIn variable is not null
+            if (searchData.LinkedIn.length == 0) {
+              searchData.LinkedIn = links[i][1];
+            }
+          }
+          if (links[i][0].includes("Phone")) {
+            // Check if Phone variable is not null
+            if (searchData.Phone.length == 0) {
+              searchData.Phone = links[i][1];
+            }
+          }
+          if (links[i][1].includes("tel:")) {
+            // Check if Phone variable is not null
+            if (searchData.Phone.length == 0) {
+              searchData.Phone = links[i][1].replace("tel:", "");
+            }
+          }
+          if (links[i][0].includes("Website")) {
+            // Check if Website variable is not null
+            if (searchData.Website.length == 0) {
+              searchData.Website = links[i][1];
+            }
+          }
+          if (links[i][0].includes("Address")) {
+            // Check if Address variable is not null
+            if (searchData.Address.length == 0) {
+              searchData.Address = links[i][1];
+            }
+          }
+          if (links[i][1].includes("local?lid")) {
+            // Check if Address variable is not null
+            if (searchData.Address.length == 0) {
+              searchData.Address = links[i][0];
+            }
+          }
+        }
+      }
+
+      return searchData;
+    }
+
+    async function ProcessWebLink(data) {
+      let searchData = data;
+
+      console.log("Process website link - in function");
+
+      await FetchFromServer("http://localhost:8080/processweblinks/", searchData.Website)
+        .then(async (doc) => {
+          return await GetLinksFromHTML(doc, undefined, searchData.Website);
+        })
+        .then(async (links) => {
+          // Process links to find events pages
+          console.log(links);
+
+          let eventCollection = [];
+
+          // Loop through links
+          for (var i = 0; i < links.length; i++) {
+            if (links[i][1].toLowerCase().includes("events")) {
+              if (!searchData.EventsMain.includes(links[i][1])) {
+                searchData.EventsMain.push(links[i][1]);
+              }
+            }
+          }
+
+          let ii = searchData.EventsMain.length;
+
+          // Just making sure that we don't get stuck in an infinite loop if there are more than 20 links
+          if (searchData.EventsMain.length > 10) {
+            ii = 10;
+          }
+
+          // Loop through found event links to obtain more event links
+          for (var i = 0; i < ii; i++) {
+            await FetchFromServer("http://localhost:8080/processweblinks/", searchData.EventsMain[i])
+              .then(async (doc) => {
+                return await GetLinksFromHTML(doc, undefined, searchData.Website);
+              })
+              .then((links) => {
+                for (var i = 0; i < links.length; i++) {
+                  // Check if links[i][1] includes "event" or "calendar"
+                  if (links[i][1].toLowerCase().includes("event") || links[i][1].toLowerCase().includes("calendar")) {
+                    if (!searchData.EventsMain.includes(links[i][1])) {
+                      searchData.EventsMain.push(links[i][1]);
+                    }
+                  }
+                }
+              });
+          }
+
+          for (var i = 0; i < eventCollection.length; i++) {
+            searchData.EventsMain.push(eventCollection[i]);
+          }
+
+          return searchData;
+        })
+        .then(async (searchData) => {
+          let ii = searchData.EventsMain.length;
+
+          // Just making sure that we don't get stuck in an infinite loop if there are more than 20 links
+          if (searchData.EventsMain.length > 10) {
+            ii = 10;
+          }
+
+          // Loop through MainEventLinks
+          for (var i = 0; i < ii; i++) {
+            let searchLink;
+
+            if (searchData.EventsMain.length > 10) {
+              searchLink = searchData.EventsMain[randomIntFromInterval(0, searchData.EventsMain.length)];
+            } else {
+              searchLink = searchData.EventsMain[i];
+            }
+
+            // Check if SearchForGoogleEventsSchema is true
+            let result = await SearchForGoogleEventSchema(searchLink);
+            console.log(result);
+            if (result.hasType == true) {
+              searchData.HasGoogleEventsSchema = true;
+              searchData.DetectedTypes.push(result.typeValue);
+              break;
+            }
+          }
+        })
+        .then(() => {
+          GenerateTable(searchData);
+        });
+    }
+
+    async function SearchForGoogleEventSchema(link) {
+      console.log(link);
+      console.log("Searching for Google events schema...");
+      return await FetchFromServer("http://localhost:8080/processweblinks/", link)
+        .then((doc) => {
+          return doc.querySelector('script[type="application/ld+json"]');
+        })
+        .then(async (script) => {
+          let typeBuffer = [];
+
+          if (script != null) {
+            let json = script.innerHTML;
+            let jsonObject = JSON.parse(json);
+            console.log(jsonObject);
+
+            // Check if @graph exists
+            if (jsonObject["@graph"] != undefined) {
+              for (var i = 0; i < jsonObject["@graph"].length; i++) {
+                let types = await DetectTypes(jsonObject);
+                // Loop throuhg types
+                // Check if types is not undefined
+                if (types != undefined) {
+                  for (var j = 0; j < types.length; j++) {
+                    // Check if type is in typeBuffer
+                    if (!typeBuffer.includes(types[j])) {
+                      typeBuffer.push(types[j]);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          console.log(typeBuffer);
+
+          // Check if typeBuffer is empty
+          if (typeBuffer.length == 0) {
+            return {
+              hasType: false,
+              typeValue: "",
+            };
+          } else {
+            return {
+              hasType: true,
+              typeValue: typeBuffer,
+            };
+          }
+        });
+    }
+
+    async function DetectTypes(jsonObject) {
+      let typeCollection = [
+        "Event",
+        "BusinessEvent",
+        "ChildrensEvent",
+        "ComedyEvent",
+        "DanceEvent",
+        "EducationEvent",
+        "EventSeries",
+        "ExhibitionEven",
+        "Festival",
+        "FoodEvent",
+        "LiteraryEvent",
+        "Hackathon",
+        "MusicEvent",
+        "SaleEvent",
+        "SocialEvent",
+        "SportsEvent",
+        "TheaterEvent",
+        "VisualArtsEvent",
+      ];
+
+      let typeBuffer = [];
+
+      // Loop through typeCollection
+      for (var i = 0; i < typeCollection.length; i++) {
+        // Count items in @graph
+
+        for (var j = 0; j < jsonObject["@graph"].length; j++) {
+          if (jsonObject["@graph"][j].hasOwnProperty("@type")) {
+            if (jsonObject["@graph"][j]["@type"].includes(typeCollection[i])) {
+              typeBuffer.push(jsonObject["@graph"][j]["@type"]);
+            }
+          }
+        }
+      }
+
+      return typeBuffer;
+    }
+
+    async function GetLinksFromHTML(firstSource, secondSource, sURL) {
+      console.log("Getting links from HTML - in function");
+
+      const { hostname } = new URL(sURL);
+
+      var x;
+      // Check if firstSource is not undefined
+      if (firstSource != undefined) {
+        x = firstSource.querySelectorAll("a");
+      }
+
+      var y;
+      if (secondSource != undefined) {
+        y = secondSource.querySelectorAll("a");
+      }
+
+      var links = [];
+
+      // Check if firstSource is not null
+      if (x != undefined) {
+        for (var i = 0; i < x.length; i++) {
+          var nametext = x[i].textContent;
+          var cleantext = nametext.replace(/\s+/g, " ").trim();
+          var cleanlink = x[i].href;
+          links.push([cleantext, cleanlink.replace("http://localhost:8080", "https://" + hostname)]);
+        }
+      }
+
+      // Check if secondSource is not null
+      if (y != undefined) {
+        for (var i = 0; i < y.length; i++) {
+          var nametext = y[i].textContent;
+          var cleantext = nametext.replace(/\s+/g, " ").trim();
+          var cleanlink = y[i].href;
+          links.push([cleantext, cleanlink.replace("http://localhost:8080", "https://" + hostname)]);
+        }
+      }
+
+      return links;
+    }
+
+    async function GenerateTable(searchData) {
+      console.log(searchData);
+      console.log("Generating table... - in function");
+      // Create a new table
+      var table = document.getElementById("business_table");
+      // Create a new row
+      var row = table.insertRow();
+
+      // Create a new cell
+      var cell1 = row.insertCell();
+      var cell2 = row.insertCell();
+      var cell3 = row.insertCell();
+      var cell4 = row.insertCell();
+      var cell5 = row.insertCell();
+      var cell6 = row.insertCell();
+      var cell7 = row.insertCell();
+      var cell8 = row.insertCell();
+      var cell9 = row.insertCell();
+      var cell10 = row.insertCell();
+
+      // Add text to the new cells
+      cell1.innerHTML = searchData.Website;
+      cell2.innerHTML = searchData.Facebook;
+      cell3.innerHTML = searchData.Twitter;
+      cell4.innerHTML = searchData.Instagram;
+      cell5.innerHTML = searchData.LinkedIn;
+      cell6.innerHTML = searchData.Phone;
+      cell7.innerHTML = searchData.Address;
+      cell8.innerHTML = searchData.EventsMain;
+      cell9.innerHTML = searchData.HasGoogleEventsSchema.toString();
+      cell10.innerHTML = searchData.DetectedTypes;
+    }
+
+    async function FetchFromServer(hostUrl, bodyData) {
+      return fetch(hostUrl, {
+        // Send post request to the main website
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bodyData,
+        }),
+      })
+        .then((response) => {
+          return response.json(); // Get the Bing response as a JSON object
+        })
+        .then((data) => {
+          // Convert data to HTML document
+          let parser = new DOMParser();
+          let doc = parser.parseFromString(data, "text/html"); // Convert the HTML JSON object to a DOM object
+
+          return doc;
+        });
+    }
+
+    function randomIntFromInterval(min, max) {
+      // min and max included
+      return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+    function CopyTableContent() {
+      var table = document.getElementById("business_table");
+      try {
+        // Copy table to clipboard
+        var text = table.outerHTML;
+        var textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+        console.log("Table copied to clipboard!");
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  </script>
+</html>

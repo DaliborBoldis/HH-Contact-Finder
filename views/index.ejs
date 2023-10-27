@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Index</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script type="text/javascript" src="jquery/jquery.js"></script>
+    <script type="text/javascript" src="jquery/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="jquery/jquery.mask.min.js"></script>
+ 
+    <script type="text/javascript" src="js/code.js"></script>
+
+    <link href="css/jquery-ui.min.css" rel="stylesheet" type="text/css">
+    <link href="css/style.css" rel="stylesheet" type="text/css">
+
+    <link href="css/select2.min.css" rel="stylesheet" />
+    <script src="js/select2.min.js"></script>
+    <script src="js/en.js"></script>
+</head>
+<body>
+    <div id="box1" align="center">
+        <div><h3>Hamlethub - online Contact Finder</h3></div>
+
+        <div id="menu" align="center"></div>
+    </div>
+</body>
+<script>
+    $.post('/menu', function(data) {
+        $('#menu').append(data);
+    });
+</script>
+</html>

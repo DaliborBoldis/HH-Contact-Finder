@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <script type="text/javascript" src="jquery/jquery.js"></script>
+    <script type="text/javascript" src="jquery/jquery-ui.min.js"></script>
+    <link href="css/jquery-ui.min.css" rel="stylesheet" type="text/css">
+    <link href="css/style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+<div id="box1" align="center">
+	<div><h3>Hamlethub - online Contact Finder</h3></div>
+    <table border="1"  class="tableStyle" align="center">
+        <tr>
+            <td>Enter Username</td>
+            <td><input type="text" id="login" value=""/></td>
+        </tr>
+        <tr>
+            <td>Enter password</td>
+            <td><input type="password" id="pass" value=""/></td>
+        </tr>
+        <tr>
+            <td colspan="2" align="center"><input id="loginButton" type="button" value="Enter" onclick="loginButton();"/></td>
+        </tr>
+    </table>
+    <p id="Login_result"></p>
+</div>
+
+<script>
+    function loginButton() {
+        // Get entered login details
+        var l_data = {
+            login: document.getElementById('login').value,
+            pass: document.getElementById('pass').value
+        }
+           $.post("/authorization", l_data, function(data) { // Send post request to verify login details
+            if (data.toString() == 'ok') { // On success
+                document.getElementById("Login_result").innerHTML = 'Logged in.';
+                location.href = '/';  
+                }
+            
+            if (data.toString() == 'denied') { // On wrong username or password
+                document.getElementById("Login_result").innerHTML = 'Invalid username or password.';  
+            } 
+                });
+    }
+</script>
+</body>
+</html>
